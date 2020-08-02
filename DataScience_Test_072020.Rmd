@@ -1,0 +1,42 @@
+---
+title: "Data Science Test July 2020"
+author: "Adnan Fiaz"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+This document outlines the answer to the Data Science Test as described in _README.md_. In short, the task is to build a model to predict the death of a set of patients. We will proceed by first performing basic data analysis to clean the data and then perform a number of model iterations including feature engineering if necessary. 
+
+```{r libraries}
+library(tidyverse)
+library(tidymodels)
+```
+
+
+## I am become Death, cleaner of data
+
+We start by reading in the data and calculating summary statistics. We already know _Death_ is a categorical variable so we force it to a factor, along with all categorical variables.
+
+
+```{r read data}
+raw_data <- read_csv('simulated_data.csv') %>%
+  mutate(Death = as.factor(Death)) %>%
+  mutate_if(is.character, as.factor)
+
+raw_data
+```
+
+```{r skim data}
+library(skimr)
+skim(raw_data)
+```
+
+As mentioned in the instructions there are indeed 300 observations and 6 columns. Starting with the outcome column, _Death_, we see there is an imbalance in the data with the majority of the observations belonging to the _survived_ category. We also see there is an equal number of observations from each of the 10 values in _Organisation_. Finally, the majority of the observations belong to the _Low_ value from the _Category_ variable but the number of observations in the other values is not insignificant.
+
+As for the numeric variables, we see that _Age_ has a very wide range from 5 to 95 but a fairly even distribution. However, the length-of-stay or _LOS_ variable is skewed to the left with a majority of the observations having a short length-of-stay. Without any further information we assume the values in _LOS_ are acceptable. 
+
+Overall, there are no missing or out of the ordinary values so we proceed without any cleaning of the data.
+
