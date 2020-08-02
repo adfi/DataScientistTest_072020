@@ -16,14 +16,14 @@ library(tidymodels)
 ```
 
 
-## I am become Death, cleaner of data
+## Cleaning data
 
 We start by reading in the data and calculating summary statistics. We already know _Death_ is a categorical variable so we force it to a factor, along with all categorical variables.
 
 
 ```{r read data}
 raw_data <- read_csv('simulated_data.csv') %>%
-  mutate(Death = as.factor(Death)) %>%
+  mutate(Death = factor(Death, labels=c("survived", "died"))) %>%
   mutate_if(is.character, as.factor)
 
 raw_data
@@ -39,4 +39,52 @@ As mentioned in the instructions there are indeed 300 observations and 6 columns
 As for the numeric variables, we see that _Age_ has a very wide range from 5 to 95 but a fairly even distribution. However, the length-of-stay or _LOS_ variable is skewed to the left with a majority of the observations having a short length-of-stay. Without any further information we assume the values in _LOS_ are acceptable. 
 
 Overall, there are no missing or out of the ordinary values so we proceed without any cleaning of the data.
+
+### Data Analysis
+
+We continue with the analysis with some basic plots to uncover any insights that might help us in the modeling steps. First, a look at the categorical variables in relation to the outcome variable. 
+
+```{r count by organisation, echo=FALSE}
+raw_data %>%
+  ggplot(aes(x=Organisation, fill=Death)) +
+  geom_bar(stat='count') + 
+  labs(title="Number of survived/died patients by Organisation", y='Number of patients')
+```
+
+Since there's an equal number of observations in each organisation splitting by the outcome variables makes for an easy comparison. The proportion of survived patients clearly varies by organisation. However we also see some organisations having roughly the same proportion such as _Trust4_, _Trust6_, _Trust9_ and _Trust10_. To reduce the levels of this categorical variable it might be useful to cluster some organisations although I think there isn't enough information in the dataset to do that. Clustering would also be useful if more organisations were added in the future, rather than retraining the model you could then just assign any new organisation to an appropriate cluster.
+
+
+```{r count by category, echo=FALSE}
+raw_data %>%
+  ggplot(aes(x=Category, fill=Death)) +
+  geom_bar(stat='count', position='fill') + 
+  labs(title="Proportion of survived/died patients by Category", y='Proportion of patients')
+```
+
+For the _Category_ variable we look at the proportion of patients as their quantity differs by value. Here we see that a _Low_ risk indeed means a lower proportion of deaths. The proportion isn't very different for the _High_ and _Moderate_ values. It will be interesting to see how that impacts the modeling.
+
+Since we mentioned clustering the organisations it is perhaps interesting to see how _Category_ differs by organisation. 
+
+```{r proportion by organisation and category, echo=FALSE}
+raw_data %>%
+  ggplot(aes(x=Organisation, fill=Category)) +
+  geom_bar(stat='count', position='fill') +
+  labs(title="Proportion patients by organisation and category")
+```
+
+
+
+```{r boxplot age, echo=FALSE}
+raw_data %>%
+  ggplot(aes(x=Death, y=Age)) +
+  geom_boxplot() +
+  labs(title="Age distribution by outcome")
+```
+
+```{r boxplot los, echo=FALSE}
+raw_data %>%
+  ggplot(aes(x=Death, y=LOS)) +
+  geom_boxplot() + 
+  labs(title="Length of stay distribution by outcome")
+```
 
