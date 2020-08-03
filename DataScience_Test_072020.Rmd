@@ -1,9 +1,7 @@
 ---
 title: "Data Science Test July 2020"
 author: "Adnan Fiaz"
-output: 
-  html_document:
-    keep_md: true
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
