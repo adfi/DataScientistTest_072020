@@ -6,13 +6,12 @@ output:
     keep_md: true
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = FALSE)
-```
+
 
 This document outlines the answer to the Data Science Test as described in _README.md_. In short, the task is to build a model to predict the death of a set of patients. We will proceed by first performing basic data analysis to clean the data and then perform a number of model iterations including feature engineering if necessary. 
 
-```{r libraries}
+
+```r
 library(tidyverse)
 library(tidymodels)
 ```
@@ -23,7 +22,8 @@ library(tidymodels)
 We start by reading in the data and calculating summary statistics. We already know _Death_ is a categorical variable so we force it to a factor, along with all categorical variables.
 
 
-```{r read data}
+
+```r
 raw_data <- read_csv('simulated_data.csv') %>%
   mutate(Death = factor(Death, labels=c("survived", "died"))) %>%
   mutate_if(is.character, as.factor)
@@ -31,10 +31,62 @@ raw_data <- read_csv('simulated_data.csv') %>%
 raw_data
 ```
 
-```{r skim data}
+```
+## # A tibble: 300 x 6
+##       ID Organisation   Age   LOS Death    Category
+##    <dbl> <fct>        <dbl> <dbl> <fct>    <fct>   
+##  1     1 Trust1          55     2 survived Low     
+##  2     2 Trust2          27     1 survived Low     
+##  3     3 Trust3          93    12 survived High    
+##  4     4 Trust4          45     3 died     Low     
+##  5     5 Trust5          70    11 survived High    
+##  6     6 Trust6          60     7 survived Moderate
+##  7     7 Trust7          25     4 survived Moderate
+##  8     8 Trust8          48     4 survived Low     
+##  9     9 Trust9          51     7 died     Low     
+## 10    10 Trust10         81     1 survived High    
+## # … with 290 more rows
+```
+
+
+```r
 library(skimr)
 skim(raw_data)
 ```
+
+
+Table: Data summary
+
+                                    
+-------------------------  ---------
+Name                       raw_data 
+Number of rows             300      
+Number of columns          6        
+_______________________             
+Column type frequency:              
+factor                     3        
+numeric                    3        
+________________________            
+Group variables            None     
+-------------------------  ---------
+
+
+**Variable type: factor**
+
+skim_variable    n_missing   complete_rate  ordered    n_unique  top_counts                         
+--------------  ----------  --------------  --------  ---------  -----------------------------------
+Organisation             0               1  FALSE            10  Tru: 30, Tru: 30, Tru: 30, Tru: 30 
+Death                    0               1  FALSE             2  sur: 247, die: 53                  
+Category                 0               1  FALSE             3  Low: 160, Mod: 87, Hig: 53         
+
+
+**Variable type: numeric**
+
+skim_variable    n_missing   complete_rate     mean      sd   p0     p25     p50      p75   p100  hist  
+--------------  ----------  --------------  -------  ------  ---  ------  ------  -------  -----  ------
+ID                       0               1   150.50   86.75    1   75.75   150.5   225.25    300  ▇▇▇▇▇ 
+Age                      0               1    50.66   27.88    5   24.00    54.0    75.25     95  ▇▅▆▆▇ 
+LOS                      0               1     4.94    3.62    1    2.00     4.0     7.00     18  ▇▃▂▁▁ 
 
 As mentioned in the instructions there are indeed 300 observations and 6 columns. Starting with the outcome column, _Death_, we see there is an imbalance in the data with the majority of the observations belonging to the _survived_ category. We also see there is an equal number of observations from each of the 10 values in _Organisation_. Finally, the majority of the observations belong to the _Low_ value from the _Category_ variable but the number of observations in the other values is not insignificant.
 
@@ -46,55 +98,28 @@ Overall, there are no missing or out of the ordinary values so we proceed withou
 
 We continue with the analysis with some basic plots to uncover any insights that might help us in the modeling steps. First, a look at the categorical variables in relation to the outcome variable. 
 
-```{r count by organisation, echo=FALSE}
-raw_data %>%
-  ggplot(aes(x=Organisation, fill=Death)) +
-  geom_bar(stat='count') + 
-  labs(title="Number of survived/died patients by Organisation", y='Number of patients')
-```
+![](DataScience_Test_072020_files/figure-html/count by organisation-1.png)<!-- -->
 
 Since there's an equal number of observations in each organisation splitting by the outcome variables makes for an easy comparison. The proportion of survived patients clearly varies by organisation. However we also see some organisations having roughly the same proportion such as _Trust4_, _Trust6_, _Trust9_ and _Trust10_. To reduce the levels of this categorical variable it might be useful to cluster some organisations although I think there isn't enough information in the dataset to do that. Clustering would also be useful if more organisations were added in the future, rather than retraining the model you could then just assign any new organisation to an appropriate cluster.
 
 
-```{r count by category, echo=FALSE}
-raw_data %>%
-  ggplot(aes(x=Category, fill=Death)) +
-  geom_bar(stat='count', position='fill') + 
-  labs(title="Proportion of survived/died patients by Category", y='Proportion of patients')
-```
+![](DataScience_Test_072020_files/figure-html/count by category-1.png)<!-- -->
 
 For the _Category_ variable we look at the proportion of patients as their quantity differs by value. Here we see that a _Low_ risk indeed means a lower proportion of deaths. The proportion isn't very different for the _High_ and _Moderate_ values. It will be interesting to see how that impacts the modeling.
 
 Since we mentioned clustering the organisations it is perhaps interesting to see how _Category_ differs by organisation. 
 
-```{r proportion by organisation and category, echo=FALSE}
-raw_data %>%
-  ggplot(aes(x=Organisation, fill=Category)) +
-  geom_bar(stat='count', position='fill') +
-  labs(title="Proportion patients by organisation and category", y="Proportion of patients")
-```
+![](DataScience_Test_072020_files/figure-html/proportion by organisation and category-1.png)<!-- -->
 
 There are organisations which have similar proportions of the _Category_ variable such as _Trust3_ and _Trust4_ but their proportion of the outcome variable still differs. Also _Trust7_ springs out with significantly different proportions yet its proportion of the outcome variable is only slightly different from other organisations. 
 
 We continue looking at the numeric variables.
 
-```{r boxplot age, echo=FALSE}
-raw_data %>%
-  ggplot(aes(x=Death, y=Age, fill=Death)) +
-  geom_violin() +
-  guides(fill=FALSE) +
-  labs(title="Age distribution by outcome")
-```
+![](DataScience_Test_072020_files/figure-html/boxplot age-1.png)<!-- -->
 
 For the _Age_ variable we see that for the _died_ outcome the distribution is skewed towards higher values. However the distribution for the _survived_ outcome seems to be bimodal. It looks like our earlier observation of a fairly even _Age_ distribution wasn't entirely true, the overall distribution looks closer to a bimodal distribution with a peak at young and old ages. 
 
-```{r boxplot los, echo=FALSE}
-raw_data %>%
-  ggplot(aes(x=Death, y=LOS, fill=Death)) +
-  geom_violin() + 
-  guides(fill=FALSE) + 
-  labs(title="Length of stay distribution by outcome")
-```
+![](DataScience_Test_072020_files/figure-html/boxplot los-1.png)<!-- -->
 
 For the _LOS_ variable we also see different distributions for the two outcome. For the _survived_ value the distribution is similar to the overall distribution, namely left skewed. For the _died_ value the distribution is more stretched out and exhibits more values for longer length of stays.
 
@@ -106,7 +131,8 @@ Altogether, this basic data analysis hasn't uncovered anything unusual requiring
 Granted we could've skipped the above data analysis and gone straight to building a model but it's equally important to get to know the data (and make pretty plots in the process). Now that we are here, we first need to establish how we will model this challenge. Since the outcome variable is binary we will need to build a classification model. As for the metric to assess model performance, we will use ROC and AUC as these are "assumption-free" metrics. Metrics such as F1-score or accuracy require assumptions about the relative importance of the outcomes and/or probability cut-off.
 
 To get an unbiased value for the metric we split the data into a training and test set.
-```{r split data}
+
+```r
 set.seed(20200803)
 
 raw_data_split <- initial_split(raw_data, prop = 0.8, strata=Death)
@@ -120,7 +146,8 @@ test_data <- testing(raw_data_split)
 
 Now that we know where we're headed let's see how we can get there really quick. It's important to establish a simple baseline model before we start adding complexity. The simplest classification model that I can think is a logistic regression. 
 
-```{r baseline}
+
+```r
 # define preprocessing (none in this case)
 baseline_recipe <- 
   recipe(Death ~ ., data=training_data) %>%
@@ -139,9 +166,24 @@ baseline_wf <- workflow() %>%
 baseline_wf
 ```
 
+```
+## ══ Workflow ═════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+## Preprocessor: Recipe
+## Model: logistic_reg()
+## 
+## ── Preprocessor ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+## 0 Recipe Steps
+## 
+## ── Model ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+## Logistic Regression Model Specification (classification)
+## 
+## Computational engine: glm
+```
+
 The above seems a bit convoluted but using the **tidymodels** framework does make it easier to iterate over models as we will see later. Next we will fit the model using 3-fold cross validation. We could just fit it once but with cross validation we get a better estimate of the unbiased metric.
 
-```{r baseline cv}
+
+```r
 set.seed(20200803)
 
 baseline_wf %>%
@@ -154,13 +196,21 @@ baseline_wf %>%
 leaderboard
 ```
 
+```
+## # A tibble: 1 x 2
+##   model      auc
+##   <chr>    <dbl>
+## 1 baseline 0.560
+```
+
 So our baseline model performs better than a model where the outcome is randomly chosen (AUC=0.5). That's great but let's see if we can improve on this.
 
 ### Model Iteration 2: Preprocessing
 
 Preprocessing is a type of feature engineering, we're providing information to the model on how to better learn from the input variables. In this case we first need to convert the categorical variables to dummy variables. Our numerical variables, _Age_ and _LOS_ are also on different scales so we can center and scale these. We will do all of this by adjusting the _recipe_.
 
-```{r workflow with preprocessing}
+
+```r
 preproces_recipe <- baseline_recipe %>%
   step_normalize(all_numeric()) %>%
   step_dummy(all_nominal(), -all_outcomes()) %>%
@@ -171,7 +221,8 @@ preprocess_wf <-
   update_recipe(preproces_recipe)
 ```
 
-```{r cv with preprocessing}
+
+```r
 set.seed(20200803)
 # at this point you should make a function of this
 preprocess_wf %>%
@@ -185,13 +236,22 @@ preprocess_wf %>%
 leaderboard
 ```
 
+```
+## # A tibble: 2 x 2
+##   model           auc
+##   <chr>         <dbl>
+## 1 preprocess_lr 0.560
+## 2 baseline      0.560
+```
+
 It seems that preprocessing doesn't have any added benefit. This could be because of two reasons: there is no actual difference in the model (i.e. there is preprocessing happening in the baseline model) or there is no actual difference in performance. The example [documentation](https://www.tidymodels.org/start/recipes/#features) states the baseline recipe I created doesn't do any preprocessing so I'll go with the second reason. We could investigate the model fits (using `pull_worklfow_fit`) to be sure but I'll leave that for another time as this isn't the final model iteration.
 
 ### Model Iteration 3: The Random Forest
 
 Now is the time to add some more complexity. We could go two ways here, add more features or try another algorithm. Trying another algorithm is quicker to do so we'll start with that. Since we'll be using a tree-based algorithm we'll skip the preprocessing as tree-based algorithms are flexible enough to handle the data without it.
 
-```{r rf spec}
+
+```r
 rf_model <- 
   rand_forest() %>%
   set_engine(engine='ranger') %>%
@@ -202,7 +262,8 @@ rf_wf <-
   update_model(rf_model)
 ```
 
-```{r cv with rf}
+
+```r
 set.seed(20200803)
 # I really wish I had made a function of this
 rf_wf %>%
@@ -214,6 +275,15 @@ rf_wf %>%
   bind_rows(leaderboard) -> leaderboard
 
 leaderboard
+```
+
+```
+## # A tibble: 3 x 2
+##   model           auc
+##   <chr>         <dbl>
+## 1 rf            0.641
+## 2 preprocess_lr 0.560
+## 3 baseline      0.560
 ```
 
 The Random Forest outperforms the logistic regression based on the AUC. In the next section we outline what next steps are possible for subsequent iterations.
