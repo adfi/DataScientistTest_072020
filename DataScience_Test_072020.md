@@ -144,7 +144,7 @@ test_data <- testing(raw_data_split)
 
 ### Model Iteration 1: The baseline
 
-Now that we know where we're headed let's see how we can get there really quick. It's important to establish a simple baseline model before we start adding complexity. The simplest classification model that I can think is a logistic regression. 
+Now that we know where we're headed let's see how we can get there really quick. It's important to establish a simple baseline model before we start adding complexity. The simplest classification model that I can think of is a logistic regression. 
 
 
 ```r
@@ -184,7 +184,7 @@ The above seems a bit convoluted but using the **tidymodels** framework does mak
 
 
 ```r
-set.seed(20200803)
+set.seed(20200803) # set random generator seed to ensure reproducibility
 
 baseline_wf %>%
   fit_resamples(vfold_cv(training_data, v=3, strata=Death),
@@ -223,7 +223,7 @@ preprocess_wf <-
 
 
 ```r
-set.seed(20200803)
+set.seed(20200803) # set seed again to ensure we get the same CV folds
 # at this point you should make a function of this
 preprocess_wf %>%
   fit_resamples(vfold_cv(training_data, v=3, strata=Death),
@@ -244,7 +244,7 @@ leaderboard
 ## 2 baseline      0.560
 ```
 
-It seems that preprocessing doesn't have any added benefit. This could be because of two reasons: there is no actual difference in the model (i.e. there is preprocessing happening in the baseline model) or there is no actual difference in performance. The example [documentation](https://www.tidymodels.org/start/recipes/#features) states the baseline recipe I created doesn't do any preprocessing so I'll go with the second reason. We could investigate the model fits (using `pull_worklfow_fit`) to be sure but I'll leave that for another time as this isn't the final model iteration.
+It seems that preprocessing doesn't have any added benefit. This could be because of two reasons: there is no actual difference in the model (i.e. there is preprocessing happening in the baseline model) or there is no actual difference in performance. The example [documentation](https://www.tidymodels.org/start/recipes/#features) states the baseline recipe we created doesn't do any preprocessing so we'll go with the second reason. We could investigate the model fits (using `pull_worklfow_fit`) to be sure but I'll leave that for another time as this isn't the final model iteration.
 
 ### Model Iteration 3: The Random Forest
 
@@ -286,25 +286,420 @@ leaderboard
 ## 3 baseline      0.560
 ```
 
-The Random Forest outperforms the logistic regression based on the AUC. In the next section we outline what next steps are possible for subsequent iterations.
+The Random Forest outperforms the logistic regression based on the AUC. Now we can train it on the entire dataset and apply it to the test data to get a final performance value.
+
+
+```r
+set.seed(20200803)
+rf_wf %>%
+  last_fit(split=raw_data_split, metrics=metric_set(roc_auc)) %>%
+  collect_metrics()
+```
+
+```
+## # A tibble: 1 x 3
+##   .metric .estimator .estimate
+##   <chr>   <chr>          <dbl>
+## 1 roc_auc binary         0.718
+```
+
 
 ## Follow up
 
 We performed three model iterations in which the Random Forest performed best. There are various reasons why it performed better than the logistic regression model but clearly there is some complexity or information in the data that isn't being captured by the logistic regression model. Possible next steps are:
 
-* Analyse performance of the best model by looking at which observations are missclassified. What information is not being captured? Which variables does the model find are most important? Since Random Forests are black box models we could supplement this analysis with LIME and/or Shapley values to find out how prediction were made.
+* Analyse performance of the best model by looking at which observations are missclassified. What information is not being captured? Which variables does the model find are most important? Since Random Forests are black box models we could supplement this analysis with LIME and/or Shapley values to find out how predictions were made.
 * Add more features. Although the Random Forest should be able to capture any non-linear information we could make things more explicit. For example, we know Age has a bimodal distribution and we can use this to create new features.
+* Since the dataset was imbalanced with respect to the outcome variable we could try balancing the dataset by upsampling or downsampling.
 * Tune hyperparameters for the best model. In the case of the Random Forest that could be the number of trees (`trees`) or the number of variables to be considered at each split (`mtry`).
 
 ## Addendum: Model Cards
 
 I recently came across the concept of [Model Cards](https://modelcards.withgoogle.com/about) and I'm trying to apply it in practice wherever possible. What particularly attracts me is the importance of describing the limits of the model and the model data. Below is an initial attempt at creating a model card for the Random Forest.
 
-Goal: Predict whether a patient will survive.
-Input:
-Output:
-Model Architecture: 500 trees trained ranger default settings
-Performance: 0.64 AUC trained on 300 observations
-Limitations: Age between 5 and 95, LOS between 1 and 18, 10 organisations and 3 categories
 
+<!--html_preserve--><style>html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
+}
 
+#grqinhhnoc .gt_table {
+  display: table;
+  border-collapse: collapse;
+  margin-left: 0;
+  margin-right: auto;
+  color: #333333;
+  font-size: 16px;
+  background-color: #FFFFFF;
+  width: auto;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: black;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: black;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: black;
+  border-left-style: solid;
+  border-left-width: 2px;
+  border-left-color: black;
+}
+
+#grqinhhnoc .gt_heading {
+  background-color: #FFFFFF;
+  text-align: center;
+  border-bottom-color: #FFFFFF;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_title {
+  color: #333333;
+  font-size: 125%;
+  font-weight: initial;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  border-bottom-color: #FFFFFF;
+  border-bottom-width: 0;
+}
+
+#grqinhhnoc .gt_subtitle {
+  color: #333333;
+  font-size: 85%;
+  font-weight: initial;
+  padding-top: 0;
+  padding-bottom: 4px;
+  border-top-color: #FFFFFF;
+  border-top-width: 0;
+}
+
+#grqinhhnoc .gt_bottom_border {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: black;
+}
+
+#grqinhhnoc .gt_col_headings {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_col_heading {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  padding-left: 5px;
+  padding-right: 5px;
+  overflow-x: hidden;
+}
+
+#grqinhhnoc .gt_column_spanner_outer {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: normal;
+  text-transform: inherit;
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+#grqinhhnoc .gt_column_spanner_outer:first-child {
+  padding-left: 0;
+}
+
+#grqinhhnoc .gt_column_spanner_outer:last-child {
+  padding-right: 0;
+}
+
+#grqinhhnoc .gt_column_spanner {
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: bottom;
+  padding-top: 5px;
+  padding-bottom: 6px;
+  overflow-x: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+#grqinhhnoc .gt_group_heading {
+  padding: 8px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#grqinhhnoc .gt_empty_group_heading {
+  padding: 0.5px;
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: solid;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  vertical-align: middle;
+}
+
+#grqinhhnoc .gt_striped {
+  background-color: rgba(128, 128, 128, 0.05);
+}
+
+#grqinhhnoc .gt_from_md > :first-child {
+  margin-top: 0;
+}
+
+#grqinhhnoc .gt_from_md > :last-child {
+  margin-bottom: 0;
+}
+
+#grqinhhnoc .gt_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  margin: 10px;
+  border-top-style: none;
+  border-top-width: 1px;
+  border-top-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 1px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 1px;
+  border-right-color: #D3D3D3;
+  vertical-align: middle;
+  overflow-x: hidden;
+}
+
+#grqinhhnoc .gt_stub {
+  color: #333333;
+  background-color: #FFFFFF;
+  font-size: 100%;
+  font-weight: initial;
+  text-transform: inherit;
+  border-right-style: solid;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+  padding-left: 12px;
+}
+
+#grqinhhnoc .gt_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#grqinhhnoc .gt_first_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_grand_summary_row {
+  color: #333333;
+  background-color: #FFFFFF;
+  text-transform: inherit;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+}
+
+#grqinhhnoc .gt_first_grand_summary_row {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  border-top-style: double;
+  border-top-width: 6px;
+  border-top-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_table_body {
+  border-top-style: solid;
+  border-top-width: 2px;
+  border-top-color: #D3D3D3;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_footnotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_footnote {
+  margin: 0px;
+  font-size: 90%;
+  padding: 4px;
+}
+
+#grqinhhnoc .gt_sourcenotes {
+  color: #333333;
+  background-color: #FFFFFF;
+  border-bottom-style: none;
+  border-bottom-width: 2px;
+  border-bottom-color: #D3D3D3;
+  border-left-style: none;
+  border-left-width: 2px;
+  border-left-color: #D3D3D3;
+  border-right-style: none;
+  border-right-width: 2px;
+  border-right-color: #D3D3D3;
+}
+
+#grqinhhnoc .gt_sourcenote {
+  font-size: 90%;
+  padding: 4px;
+}
+
+#grqinhhnoc .gt_left {
+  text-align: left;
+}
+
+#grqinhhnoc .gt_center {
+  text-align: center;
+}
+
+#grqinhhnoc .gt_right {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+#grqinhhnoc .gt_font_normal {
+  font-weight: normal;
+}
+
+#grqinhhnoc .gt_font_bold {
+  font-weight: bold;
+}
+
+#grqinhhnoc .gt_font_italic {
+  font-style: italic;
+}
+
+#grqinhhnoc .gt_super {
+  font-size: 65%;
+}
+
+#grqinhhnoc .gt_footnote_marks {
+  font-style: italic;
+  font-size: 65%;
+}
+</style>
+<div id="grqinhhnoc" style="overflow-x:auto;overflow-y:auto;width:auto;height:auto;"><table class="gt_table">
+  <thead class="gt_header">
+    <tr>
+      <th colspan="2" class="gt_heading gt_title gt_font_normal" style>Model Card Predict Patient Death</th>
+    </tr>
+    <tr>
+      <th colspan="2" class="gt_heading gt_subtitle gt_font_normal gt_bottom_border" style></th>
+    </tr>
+  </thead>
+  
+  <tbody class="gt_table_body">
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Goal:</td>
+      <td class="gt_row gt_left">Predict whether a patient will survive</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Input:</td>
+      <td class="gt_row gt_left">Organisation, Category, Age and Length of Stay (LOS)</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Output</td>
+      <td class="gt_row gt_left">A value from {"survived", "died"}</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Model Architecture:</td>
+      <td class="gt_row gt_left">Random Forest trained with the {ranger} package, default settings</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Performance:</td>
+      <td class="gt_row gt_left">0.71 Test AUC (59 observations)</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;">Limitations:</td>
+      <td class="gt_row gt_left">5 &lt;= Age &lt;= 95</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;"></td>
+      <td class="gt_row gt_left">1 &lt;= LOS &lt;= 18</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;"></td>
+      <td class="gt_row gt_left">10 Organisations</td>
+    </tr>
+    <tr>
+      <td class="gt_row gt_left" style="font-weight: bold;"></td>
+      <td class="gt_row gt_left">3 Categories</td>
+    </tr>
+  </tbody>
+  
+  
+</table></div><!--/html_preserve-->

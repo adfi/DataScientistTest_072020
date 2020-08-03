@@ -118,7 +118,7 @@ test_data <- testing(raw_data_split)
 
 ### Model Iteration 1: The baseline
 
-Now that we know where we're headed let's see how we can get there really quick. It's important to establish a simple baseline model before we start adding complexity. The simplest classification model that I can think is a logistic regression. 
+Now that we know where we're headed let's see how we can get there really quick. It's important to establish a simple baseline model before we start adding complexity. The simplest classification model that I can think of is a logistic regression. 
 
 ```{r baseline}
 # define preprocessing (none in this case)
@@ -142,7 +142,7 @@ baseline_wf
 The above seems a bit convoluted but using the **tidymodels** framework does make it easier to iterate over models as we will see later. Next we will fit the model using 3-fold cross validation. We could just fit it once but with cross validation we get a better estimate of the unbiased metric.
 
 ```{r baseline cv}
-set.seed(20200803)
+set.seed(20200803) # set random generator seed to ensure reproducibility
 
 baseline_wf %>%
   fit_resamples(vfold_cv(training_data, v=3, strata=Death),
@@ -172,7 +172,7 @@ preprocess_wf <-
 ```
 
 ```{r cv with preprocessing}
-set.seed(20200803)
+set.seed(20200803) # set seed again to ensure we get the same CV folds
 # at this point you should make a function of this
 preprocess_wf %>%
   fit_resamples(vfold_cv(training_data, v=3, strata=Death),
@@ -185,7 +185,7 @@ preprocess_wf %>%
 leaderboard
 ```
 
-It seems that preprocessing doesn't have any added benefit. This could be because of two reasons: there is no actual difference in the model (i.e. there is preprocessing happening in the baseline model) or there is no actual difference in performance. The example [documentation](https://www.tidymodels.org/start/recipes/#features) states the baseline recipe I created doesn't do any preprocessing so I'll go with the second reason. We could investigate the model fits (using `pull_worklfow_fit`) to be sure but I'll leave that for another time as this isn't the final model iteration.
+It seems that preprocessing doesn't have any added benefit. This could be because of two reasons: there is no actual difference in the model (i.e. there is preprocessing happening in the baseline model) or there is no actual difference in performance. The example [documentation](https://www.tidymodels.org/start/recipes/#features) states the baseline recipe we created doesn't do any preprocessing so we'll go with the second reason. We could investigate the model fits (using `pull_worklfow_fit`) to be sure but I'll leave that for another time as this isn't the final model iteration.
 
 ### Model Iteration 3: The Random Forest
 
@@ -216,25 +216,58 @@ rf_wf %>%
 leaderboard
 ```
 
-The Random Forest outperforms the logistic regression based on the AUC. In the next section we outline what next steps are possible for subsequent iterations.
+The Random Forest outperforms the logistic regression based on the AUC. Now we can train it on the entire dataset and apply it to the test data to get a final performance value.
+
+```{r final model}
+set.seed(20200803)
+rf_wf %>%
+  last_fit(split=raw_data_split, metrics=metric_set(roc_auc)) %>%
+  collect_metrics()
+```
+
 
 ## Follow up
 
 We performed three model iterations in which the Random Forest performed best. There are various reasons why it performed better than the logistic regression model but clearly there is some complexity or information in the data that isn't being captured by the logistic regression model. Possible next steps are:
 
-* Analyse performance of the best model by looking at which observations are missclassified. What information is not being captured? Which variables does the model find are most important? Since Random Forests are black box models we could supplement this analysis with LIME and/or Shapley values to find out how prediction were made.
+* Analyse performance of the best model by looking at which observations are missclassified. What information is not being captured? Which variables does the model find are most important? Since Random Forests are black box models we could supplement this analysis with LIME and/or Shapley values to find out how predictions were made.
 * Add more features. Although the Random Forest should be able to capture any non-linear information we could make things more explicit. For example, we know Age has a bimodal distribution and we can use this to create new features.
+* Since the dataset was imbalanced with respect to the outcome variable we could try balancing the dataset by upsampling or downsampling.
 * Tune hyperparameters for the best model. In the case of the Random Forest that could be the number of trees (`trees`) or the number of variables to be considered at each split (`mtry`).
 
 ## Addendum: Model Cards
 
 I recently came across the concept of [Model Cards](https://modelcards.withgoogle.com/about) and I'm trying to apply it in practice wherever possible. What particularly attracts me is the importance of describing the limits of the model and the model data. Below is an initial attempt at creating a model card for the Random Forest.
 
-Goal: Predict whether a patient will survive.
-Input:
-Output:
-Model Architecture: 500 trees trained ranger default settings
-Performance: 0.64 AUC trained on 300 observations
-Limitations: Age between 5 and 95, LOS between 1 and 18, 10 organisations and 3 categories
 
+```{r model card, echo=FALSE}
+library(gt)
 
+tribble(
+  ~Name, ~Value,
+  'Goal:', 'Predict whether a patient will survive',
+  'Input:', 'Organisation, Category, Age and Length of Stay (LOS)',
+  'Output', 'A value from {"survived", "died"}',
+  'Model Architecture:', 'Random Forest trained with the {ranger} package, default settings',
+  'Performance:', '0.71 Test AUC (59 observations)',
+  'Limitations:', '5 <= Age <= 95',
+  '', '1 <= LOS <= 18',
+  '', '10 Organisations',
+  '', '3 Categories'
+) %>%
+  gt() %>%
+  tab_options(table.align = "left", column_labels.hidden=TRUE,
+              table.border.top.style='solid',
+              table.border.right.style='solid',
+              table.border.left.style='solid',
+              table_body.border.bottom.style='none',
+              table.border.top.color='black',
+              table.border.right.color='black',
+              table.border.left.color='black',
+              table.border.bottom.color='black',
+              heading.border.bottom.color = 'black', 
+              table_body.hlines.style = "none",) %>%
+  tab_style(style = cell_text(weight = 'bold'), 
+            location = cells_body(columns='Name')) %>%
+  tab_header(title="Model Card Predict Patient Death")
+```
